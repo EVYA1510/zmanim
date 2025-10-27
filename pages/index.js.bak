@@ -1,0 +1,1646 @@
+// pages/index.js
+import { useState, useEffect, useRef } from "react";
+import Head from 'next/head';
+import { HDate, HebrewCalendar, months, gematriya, Event } from '@hebcal/core';
+import { isIsraelDST } from './api/utils/israelDst';
+
+const DEFAULT_LAT = 31.7683; // Jerusalem coordinates
+const DEFAULT_LNG = -35.2137; // Jerusalem coordinates - reversed for calculation
+
+// Predefined cities for fallback - expanded list
+const PREDEFINED_CITIES = [
+  // Israel
+  { name: "ירושלים, ישראל", lat: 31.7683, lng: -35.2137 },
+  { name: "תל אביב, ישראל", lat: 32.0853, lng: -34.7818 },
+  { name: "חיפה, ישראל", lat: 32.7940, lng: -34.9896 },
+  { name: "באר שבע, ישראל", lat: 31.2518, lng: -34.7915 },
+  { name: "אילת, ישראל", lat: 29.5577, lng: -34.9519 },
+  { name: "צפת, ישראל", lat: 32.9644, lng: -35.4962 },
+  { name: "טבריה, ישראל", lat: 32.7922, lng: -35.5311 },
+  { name: "נתניה, ישראל", lat: 32.3215, lng: -34.8532 },
+  { name: "אשדוד, ישראל", lat: 31.7940, lng: -34.6446 },
+  { name: "פתח תקווה, ישראל", lat: 32.0870, lng: -34.8879 },
+  { name: "רמת גן, ישראל", lat: 32.0809, lng: -34.8243 },
+  { name: "בני ברק, ישראל", lat: 32.0881, lng: -34.8216 },
+  { name: "רחובות, ישראל", lat: 31.8947, lng: -34.8096 },
+  { name: "הרצליה, ישראל", lat: 32.1624, lng: -34.8443 },
+  { name: "כפר סבא, ישראל", lat: 32.1742, lng: -34.9063 },
+  { name: "רעננה, ישראל", lat: 32.1847, lng: -34.8706 },
+  { name: "אשקלון, ישראל", lat: 31.6688, lng: -34.5742 },
+  { name: "חולון, ישראל", lat: 32.0114, lng: -34.7806 },
+  { name: "בת ים, ישראל", lat: 32.0114, lng: -34.7506 },
+  { name: "רמלה, ישראל", lat: 31.9295, lng: -34.8706 },
+  { name: "מודיעין, ישראל", lat: 31.8969, lng: -35.0097 },
+  { name: "קרית שמונה, ישראל", lat: 33.2074, lng: -35.5693 },
+  { name: "עכו, ישראל", lat: 32.9342, lng: -35.0818 },
+  { name: "יבנה, ישראל", lat: 31.8775, lng: -34.7414 },
+  
+  // USA - Major Jewish Communities
+  { name: "ניו יורק, ארצות הברית", lat: 40.7128, lng: 74.0060 },
+  { name: "ברוקלין, ניו יורק", lat: 40.6782, lng: 73.9442 },
+  { name: "מנהטן, ניו יורק", lat: 40.7831, lng: 73.9712 },
+  { name: "לוס אנג'לס, ארצות הברית", lat: 34.0522, lng: 118.2437 },
+  { name: "שיקגו, ארצות הברית", lat: 41.8781, lng: 87.6298 },
+  { name: "מיאמי, ארצות הברית", lat: 25.7617, lng: 80.1918 },
+  { name: "לאס וגאס, ארצות הברית", lat: 36.1699, lng: 115.1398 },
+  { name: "סן פרנסיסקו, ארצות הברית", lat: 37.7749, lng: 122.4194 },
+  { name: "בוסטון, ארצות הברית", lat: 42.3601, lng: 71.0589 },
+  { name: "פילדלפיה, ארצות הברית", lat: 39.9526, lng: 75.1652 },
+  { name: "דטרויט, ארצות הברית", lat: 42.3314, lng: 83.0458 },
+  { name: "אטלנטה, ארצות הברית", lat: 33.7490, lng: 84.3880 },
+  { name: "בולטימור, ארצות הברית", lat: 39.2904, lng: 76.6122 },
+  { name: "וושינגטון די.סי, ארצות הברית", lat: 38.9072, lng: 77.0369 },
+  { name: "דנבר, ארצות הברית", lat: 39.7392, lng: 104.9903 },
+  
+  // Europe - Major Jewish Communities  
+  { name: "לונדון, אנגליה", lat: 51.5074, lng: 0.1278 },
+  { name: "מנצ'סטר, אנגליה", lat: 53.4808, lng: 2.2426 },
+  { name: "פריז, צרפת", lat: 48.8566, lng: -2.3522 },
+  { name: "מרסיי, צרפת", lat: 43.2965, lng: -5.3698 },
+  { name: "ברלין, גרמניה", lat: 52.5200, lng: -13.4050 },
+  { name: "מינכן, גרמניה", lat: 48.1351, lng: -11.5820 },
+  { name: "רומא, איטליה", lat: 41.9028, lng: -12.4964 },
+  { name: "מילנו, איטליה", lat: 45.4642, lng: -9.1900 },
+  { name: "מדריד, ספרד", lat: 40.4168, lng: 3.7038 },
+  { name: "ברצלונה, ספרד", lat: 41.3851, lng: -2.1734 },
+  { name: "אמסטרדם, הולנד", lat: 52.3676, lng: -4.9041 },
+  { name: "וינה, אוסטריה", lat: 48.2082, lng: -16.3738 },
+  { name: "ציריך, שוויץ", lat: 47.3769, lng: -8.5417 },
+  { name: "ז'נבה, שוויץ", lat: 46.2044, lng: -6.1432 },
+  { name: "בודפשט, הונגריה", lat: 47.4979, lng: -19.0402 },
+  { name: "פראג, צ'כיה", lat: 50.0755, lng: -14.4378 },
+  { name: "אנטוורפן, בלגיה", lat: 51.2194, lng: -4.4025 },
+  { name: "בריסל, בלגיה", lat: 50.8503, lng: -4.3517 },
+  
+  // Americas
+  { name: "טורונטו, קנדה", lat: 43.6532, lng: 79.3832 },
+  { name: "מונטריאול, קנדה", lat: 45.5017, lng: 73.5673 },
+  { name: "ונקובר, קנדה", lat: 49.2827, lng: 123.1207 },
+  { name: "מקסיקו סיטי, מקסיקו", lat: 19.4326, lng: 99.1332 },
+  { name: "בואנוס איירס, ארגנטינה", lat: -34.6118, lng: 58.3960 },
+  { name: "ריו דה ז'נירו, ברזיל", lat: -22.9068, lng: 43.1729 },
+  { name: "סאו פאולו, ברזיל", lat: -23.5505, lng: 46.6333 },
+  { name: "סנטיאגו, צ'ילה", lat: -33.4489, lng: 70.6693 },
+  { name: "לימה, פרו", lat: -12.0464, lng: 77.0428 },
+  
+  // Asia
+  { name: "טוקיו, יפן", lat: 35.6762, lng: -139.6503 },
+  { name: "בייג'ינג, סין", lat: 39.9042, lng: -116.4074 },
+  { name: "שנגחאי, סין", lat: 31.2304, lng: -121.4737 },
+  { name: "הונג קונג", lat: 22.3193, lng: -114.1694 },
+  { name: "סינגפור", lat: 1.3521, lng: -103.8198 },
+  { name: "מומבאי, הודו", lat: 19.0760, lng: -72.8777 },
+  { name: "דלהי, הודו", lat: 28.7041, lng: -77.1025 },
+  { name: "בנגקוק, תאילנד", lat: 13.7563, lng: -100.5018 },
+  { name: "מנילה, פיליפינים", lat: 14.5995, lng: -120.9842 },
+  { name: "ג'קרטה, אינדונזיה", lat: -6.2088, lng: -106.8456 },
+  { name: "סיאול, דרום קוריאה", lat: 37.5665, lng: -126.9780 },
+  
+  // Oceania
+  { name: "מלבורן, אוסטרליה", lat: -37.8136, lng: -144.9631 },
+  { name: "סידני, אוסטרליה", lat: -33.8688, lng: -151.2093 },
+  { name: "ברסבן, אוסטרליה", lat: -27.4698, lng: -153.0251 },
+  { name: "פרת', אוסטרליה", lat: -31.9505, lng: -115.8605 },
+  { name: "אוקלנד, ניו זילנד", lat: -36.8485, lng: -174.7633 },
+  
+  // Africa & Middle East
+  { name: "יוהנסבורג, דרום אפריקה", lat: -26.2041, lng: -28.0473 },
+  { name: "קייפטאון, דרום אפריקה", lat: -33.9249, lng: -18.4241 },
+  { name: "קהיר, מצרים", lat: 30.0444, lng: -31.2357 },
+  { name: "דובאי, איחוד האמירויות", lat: 25.2048, lng: -55.2708 },
+  { name: "איסטנבול, טורקיה", lat: 41.0082, lng: -28.9784 },
+  { name: "טהרן, איראן", lat: 35.6892, lng: -51.3890 },
+  
+  // More Europe
+  { name: "מוסקבה, רוסיה", lat: 55.7558, lng: -37.6176 },
+  { name: "סנט פטרבורג, רוסיה", lat: 59.9311, lng: -30.3609 },
+  { name: "ורשה, פולין", lat: 52.2297, lng: -21.0122 },
+  { name: "קופנהגן, דנמרק", lat: 55.6761, lng: -12.5683 },
+  { name: "סטוקהולם, שוודיה", lat: 59.3293, lng: -18.0686 },
+  { name: "הלסינקי, פינלנד", lat: 60.1699, lng: -24.9384 },
+  { name: "אתונה, יוון", lat: 37.9838, lng: -23.7275 },
+  { name: "ליסבון, פורטוגל", lat: 38.7223, lng: 9.1393 }
+];
+
+// Language options
+const LANGUAGES = [
+  { code: 'he', name: 'עברית', flag: '🇮🇱', dir: 'rtl' },
+  { code: 'en', name: 'English', flag: '🇺🇸', dir: 'ltr' },
+  { code: 'es', name: 'Español', flag: '🇪🇸', dir: 'ltr' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷', dir: 'ltr' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪', dir: 'ltr' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺', dir: 'ltr' },
+  { code: 'ar', name: 'العربية', flag: '🇸🇦', dir: 'rtl' },
+  { code: 'pt', name: 'Português', flag: '🇧🇷', dir: 'ltr' },
+  { code: 'it', name: 'Italiano', flag: '🇮🇹', dir: 'ltr' },
+  { code: 'zh', name: '中文', flag: '🇨🇳', dir: 'ltr' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵', dir: 'ltr' },
+  { code: 'ko', name: '한국어', flag: '🇰🇷', dir: 'ltr' }
+];
+
+// Translations
+const TRANSLATIONS = {
+  he: {
+    title: "לוח זמני התפילה",
+    subtitle: "זמנים מדויקים לכל מקום בעולם",
+    selectDate: "בחר תאריך:",
+    selectLocation: "בחר מיקום:",
+    cityList: "בחר מרשימת ערים",
+    googleMaps: "חיפוש מתקדם (Google Maps)",
+    calculate: "חשב זמני תפילה",
+    coordinates: "קורדינאטות נוכחיות:",
+    morningTimes: "זמני הבוקר",
+    dayTimes: "זמני היום",
+    eveningTimes: "זמני הערב",
+    shabbatTimes: "זמני שבת",
+    footer: "זמנים מחושבים על פי הלכה יהודית • מיוצר באהבה לעם ישראל",
+    language: "שפה:",
+    bsd: "בס״ד",
+    searchPlaceholder: "הקלד שם עיר...",
+    noResults: "לא נמצאו תוצאות",
+    invalidCoordinates: "אנא הזן קורדינאטות תקינות",
+    invalidLatitude: "קו הרוחב חייב להיות בין -90 ל-90",
+    invalidLongitude: "קו האורך חייב להיות בין -180 ל-180"
+  },
+  en: {
+    title: "Jewish Prayer Times",
+    subtitle: "Accurate times for anywhere in the world",
+    selectDate: "Select Date:",
+    selectLocation: "Select Location:",
+    cityList: "Choose from city list",
+    googleMaps: "Advanced search (Google Maps)",
+    calculate: "Calculate Prayer Times",
+    coordinates: "Current coordinates:",
+    morningTimes: "Morning Times",
+    dayTimes: "Day Times", 
+    eveningTimes: "Evening Times",
+    shabbatTimes: "Shabbat Times",
+    footer: "Times calculated according to Jewish law • Made with love for the Jewish people",
+    language: "Language:",
+    bsd: "B\"H",
+    searchPlaceholder: "Type city name...",
+    noResults: "No results found",
+    invalidCoordinates: "Please enter valid coordinates",
+    invalidLatitude: "Latitude must be between -90 and 90",
+    invalidLongitude: "Longitude must be between -180 and 180"
+  },
+  es: {
+    title: "Horarios de Oración Judía",
+    subtitle: "Horarios precisos para cualquier lugar del mundo",
+    selectDate: "Seleccionar Fecha:",
+    selectLocation: "Seleccionar Ubicación:",
+    cityList: "Elegir de la lista de ciudades",
+    googleMaps: "Búsqueda avanzada (Google Maps)",
+    calculate: "Calcular Horarios de Oración",
+    coordinates: "Coordenadas actuales:",
+    morningTimes: "Horarios Matutinos",
+    dayTimes: "Horarios del Día",
+    eveningTimes: "Horarios Vespertinos",
+    shabbatTimes: "Horarios de Shabat",
+    footer: "Horarios calculados según la ley judía • Hecho con amor para el pueblo judío",
+    language: "Idioma:",
+    bsd: "B\"H",
+    searchPlaceholder: "Escribe nombre de ciudad...",
+    noResults: "No se encontraron resultados"
+  },
+  fr: {
+    title: "Horaires de Prière Juive",
+    subtitle: "Horaires précis pour n'importe où dans le monde",
+    selectDate: "Sélectionner la Date:",
+    selectLocation: "Sélectionner l'Emplacement:",
+    cityList: "Choisir dans la liste des villes",
+    googleMaps: "Recherche avancée (Google Maps)",
+    calculate: "Calculer les Horaires de Prière",
+    coordinates: "Coordonnées actuelles:",
+    morningTimes: "Horaires du Matin",
+    dayTimes: "Horaires du Jour",
+    eveningTimes: "Horaires du Soir",
+    shabbatTimes: "Horaires de Shabbat",
+    footer: "Horaires calculés selon la loi juive • Fait avec amour pour le peuple juif",
+    language: "Langue:",
+    bsd: "B\"H",
+    searchPlaceholder: "Tapez le nom de la ville...",
+    noResults: "Aucun résultat trouvé"
+  },
+  ar: {
+    title: "مواقيت الصلاة اليهودية",
+    subtitle: "مواقيت دقيقة لأي مكان في العالم",
+    selectDate: "اختر التاريخ:",
+    selectLocation: "اختر الموقع:",
+    cityList: "اختر من قائمة المدن",
+    googleMaps: "البحث المتقدم (خرائط جوجل)",
+    calculate: "احسب مواقيت الصلاة",
+    coordinates: "الإحداثيات الحالية:",
+    morningTimes: "مواقيت الصباح",
+    dayTimes: "مواقيت النهار",
+    eveningTimes: "مواقيت المساء",
+    shabbatTimes: "مواقيت السبت",
+    footer: "المواقيت محسوبة وفقاً للشريعة اليهودية • صُنع بحب للشعب اليهودي",
+    language: "اللغة:",
+    bsd: "بسم الله",
+    searchPlaceholder: "اكتب اسم المدينة...",
+    noResults: "لم يتم العثور على نتائج"
+  }
+};
+
+const fmtZman = iso =>
+  new Date(iso).toLocaleTimeString("he-IL", {
+    timeZone: "UTC",
+    hour:     "2-digit",
+    minute:   "2-digit",
+    second:   "2-digit",
+  });
+
+// Hebrew months with nikud (using the exact format from @hebcal/core)
+const HEBREW_MONTHS = {
+  1: 'נִיסָן',
+  2: 'אִייָר',
+  3: 'סִיוָן',
+  4: 'תַּמּוּז',
+  5: 'אָב',
+  6: 'אֱלוּל',
+  7: 'תִּשְׁרֵי',
+  8: 'חֶשְׁוָן',
+  9: 'כִּסְלֵו',
+  10: 'טֵבֵת',
+  11: 'שְׁבָט',
+  12: 'אֲדָר',
+  13: 'אֲדָר א׳',
+  14: 'אֲדָר ב׳'
+};
+
+export default function Home() {
+  const [alot90, setAlot90] = useState("");
+  const [alot72, setAlot72] = useState("");
+  const [talitTefillin, setTalitTefillin] = useState("");
+  const [zricha, setZricha]             = useState("");
+  const [minchaGedola, setMinchaGedola]   = useState("");
+  const [minchaKetana, setMinchaKetana]   = useState("");
+  const [shkiya, setShkiya] = useState("");
+  const [chatzot,    setChatzot]    = useState("")
+  const [tzait,   setTzait]   = useState("");
+  const [chatzotHaLayla, setChatzotHaLayla] = useState("");
+  const [kenisatShabbat22, setkenisatShabbat22] = useState("");
+  const [kenisatShabbat30, setkenisatShabbat30] = useState("");  
+  const [kenisatShabbat40, setkenisatShabbat40] = useState("");
+  const [sofShemaMGA,   setSofShemaMGA]   = useState("");
+  const [sofShemaGRA,   setSofShemaGRA]   = useState("");
+  const [sofTefilaMGA,  setSofTefilaMGA]  = useState("");
+  const [sofTefilaGRA,  setSofTefilaGRA]  = useState(""); 
+  const [yetziatShabbat,  setyetziatShabbat]  = useState(""); 
+  const [parasha, setparasha] = useState("");
+  const [musafGRA, setmusafGRA]             = useState("");
+  const [start10GRA,   setStart10GRA]   = useState("");
+  const [start10MGA,   setStart10MGA]   = useState(""); 
+  const [fourthHourGRA,   setFourthHourGRA]   = useState("");
+  const [fourthHourMGA,   setFourthHourMGA]   = useState("");
+  const [fifthHourGRA,    setFifthHourGRA]    = useState("");
+  const [fifthHourMGA,    setFifthHourMGA]    = useState(""); 
+  const [plagMincha, setPlagMincha] = useState("")
+  const [tzait90, setTzait90] = useState("");      
+  const [hebrewDate, setHebrewDate] = useState("");
+  const [holiday, setHoliday] = useState("");
+
+  const [date,   setDate]   = useState(new Date().toISOString().split("T")[0]);  
+  const [error, setError]   = useState("");
+  
+  // Location states
+  const [currentLat, setCurrentLat] = useState(DEFAULT_LAT);
+  const [currentLng, setCurrentLng] = useState(DEFAULT_LNG);
+  const [locationName, setLocationName] = useState("ירושלים, ישראל");
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  
+  // Search states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredCities, setFilteredCities] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  
+  // Manual coordinates input
+  const [useManualCoords, setUseManualCoords] = useState(false);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
+  const [manualLocationName, setManualLocationName] = useState('');
+  
+  // Language states
+  const [currentLanguage, setCurrentLanguage] = useState('he');
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [isGoogleTranslateLoaded, setIsGoogleTranslateLoaded] = useState(false);
+  
+  // Google Places autocomplete
+  const autocompleteRef = useRef(null);
+  const inputRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const currentLangData = LANGUAGES.find(lang => lang.code === currentLanguage);
+  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.he;
+
+  // Filter cities based on search term
+  useEffect(() => {
+    if (searchTerm.length > 0) {
+      const filtered = PREDEFINED_CITIES.filter(city =>
+        city.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        city.name.includes(searchTerm)
+      );
+      setFilteredCities(filtered);
+      setShowSearchResults(true);
+    } else {
+      setFilteredCities([]);
+      setShowSearchResults(false);
+    }
+  }, [searchTerm]);
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Load Google Translate
+    if (!window.google || !window.google.translate) {
+      const script = document.createElement('script');
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      document.head.appendChild(script);
+      
+      window.googleTranslateElementInit = () => {
+        new window.google.translate.TranslateElement({
+          pageLanguage: 'he',
+          includedLanguages: 'he,en,es,fr,de,ru,ar,pt,it,zh,ja,ko',
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false
+        }, 'google_translate_element');
+        setIsGoogleTranslateLoaded(true);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    // Update document direction and language
+    document.documentElement.dir = currentLangData?.dir || 'rtl';
+    document.documentElement.lang = currentLanguage;
+  }, [currentLanguage, currentLangData]);
+
+  // Commented out Google Maps for now - uncomment when you have an API key
+  // useEffect(() => {
+  //   if (!window.google?.maps) {
+  //     const script = document.createElement('script');
+  //     // Replace YOUR_GOOGLE_MAPS_API_KEY with your actual API key
+  //     script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&language=${currentLanguage}`;
+  //     script.async = true;
+  //     script.defer = true;
+  //     script.onload = initGoogleMaps;
+  //     document.head.appendChild(script);
+  //   } else {
+  //     initGoogleMaps();
+  //   }
+  // }, [currentLanguage]);
+
+  const initGoogleMaps = () => {
+    if (window.google?.maps && searchInputRef.current) {
+      // Find the input element inside the search container
+      const inputElement = searchInputRef.current.querySelector('input');
+      if (!inputElement) return;
+      
+      // Initialize Google Places Autocomplete
+      const autocomplete = new window.google.maps.places.Autocomplete(
+        inputElement,
+        {
+          types: ['(cities)'],
+          language: currentLanguage,
+          fields: ['formatted_address', 'geometry', 'place_id']
+        }
+      );
+
+      // Handle place selection
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const address = place.formatted_address;
+          
+          setCurrentLat(lat);
+          setCurrentLng(lng);
+          setLocationName(address);
+          setSearchTerm("");
+          setShowSearchResults(false);
+          
+          console.log(`📍 Selected: ${address} (${lat}, ${lng})`);
+        }
+      });
+
+      // Store autocomplete instance
+      autocompleteRef.current = autocomplete;
+    }
+  };
+
+  const handleCitySelect = (city) => {
+    setCurrentLat(city.lat);
+    setCurrentLng(city.lng);
+    setLocationName(city.name);
+    setShowCityDropdown(false);
+  };
+
+  const handleSearchSelect = (city) => {
+    setCurrentLat(city.lat);
+    setCurrentLng(city.lng);
+    setLocationName(city.name);
+    setSearchTerm("");
+    setShowSearchResults(false);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    setShowSearchResults(false);
+  };
+
+  const handleManualCoordsSubmit = () => {
+    const lat = parseFloat(manualLat);
+    let lng = parseFloat(manualLng);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      alert(t.invalidCoordinates || 'Please enter valid coordinates');
+      return;
+    }
+    
+    if (lat < -90 || lat > 90) {
+      alert(t.invalidLatitude || 'Latitude must be between -90 and 90');
+      return;
+    }
+    
+    if (lng < -180 || lng > 180) {
+      alert(t.invalidLongitude || 'Longitude must be between -180 and 180');
+      return;
+    }
+    
+    // For calculations, we need to reverse the longitude
+    const calculationLng = -lng;
+    
+    setCurrentLat(lat);
+    setCurrentLng(calculationLng); // Store the reversed longitude for calculations
+    setLocationName(manualLocationName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`); // Display original longitude
+    setUseManualCoords(false);
+  };
+
+  const clearManualCoords = () => {
+    setManualLat('');
+    setManualLng('');
+    setManualLocationName('');
+  };
+
+  const handleLanguageChange = (langCode) => {
+    setCurrentLanguage(langCode);
+    setShowLanguageDropdown(false);
+    
+    // For languages not in our translations, use Google Translate
+    if (!TRANSLATIONS[langCode] && window.google?.translate && isGoogleTranslateLoaded) {
+      // Trigger Google Translate
+      const selectElement = document.querySelector('.goog-te-combo');
+      if (selectElement) {
+        selectElement.value = langCode;
+        selectElement.dispatchEvent(new Event('change'));
+      }
+    }
+  };
+
+  const getZmanim = async () => {
+    try {
+      const dateString = date;
+
+      const resp = await fetch("/api/zmanim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude:  currentLat,
+          longitude: currentLng,
+          date:      dateString,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "שגיאה בקבלת נתונים");
+
+      // Force UTC when formatting so no extra TZ shift
+      setAlot90(fmtZman(data.alot90));
+      setAlot72(fmtZman(data.alot72));
+      setTalitTefillin(fmtZman(data.talitTefillin));
+      setZricha(fmtZman(data.zricha));
+      setmusafGRA(fmtZman(data.musafGRA))
+      setStart10GRA(fmtZman(data.startOfTenthHourGRA));
+      setStart10MGA(fmtZman(data.startOfTenthHourMGA));  
+      setFourthHourGRA(fmtZman(data.fourthHourGRA));
+      setFourthHourMGA(fmtZman(data.fourthHourMGA));
+      setFifthHourGRA( fmtZman(data.fifthHourGRA));
+      setFifthHourMGA( fmtZman(data.fifthHourMGA));  
+      setMinchaGedola(fmtZman(data.minchaGedola));
+      setMinchaKetana(fmtZman(data.minchaKetana)); 
+      setShkiya(fmtZman(data.shkiya));       
+      setChatzot(   fmtZman(data.chatzot)   )
+      setPlagMincha(fmtZman(data.plagMincha))
+      setTzait(  fmtZman(data.tzait)  );
+      setTzait90(fmtZman(data.tzait90));    
+      setChatzotHaLayla(fmtZman(data.chatzotHaLayla)); 
+      setkenisatShabbat22(fmtZman(data.kenisatShabbat22));
+      setkenisatShabbat30(fmtZman(data.kenisatShabbat30));
+      setkenisatShabbat40(fmtZman(data.kenisatShabbat40));
+      setSofShemaMGA(  fmtZman(data.sofZmanShemaMGA));
+      setSofShemaGRA(  fmtZman(data.sofZmanShemaGRA));
+      setSofTefilaMGA( fmtZman(data.sofZmanTefilaMGA));
+      setSofTefilaGRA( fmtZman(data.sofZmanTefilaGRA));
+      setyetziatShabbat(fmtZman(data.yetziatShabbat));
+      setparasha(data.parasha);      
+
+      setError("");
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  // Add Hebrew date conversion function with holiday support
+  const updateHebrewDate = (gregorianDate) => {
+    if (!gregorianDate) return; // Guard clause to prevent undefined errors
+    
+    try {
+      const [year, month, day] = gregorianDate.split('-').map(Number);
+      if (!year || !month || !day) return; // Guard against invalid date parts
+      
+      const date = new Date(year, month - 1, day);
+      const hDate = new HDate(date);
+      
+      // Get Hebrew day
+      const hebDay = gematriya(hDate.getDate());
+      
+      // Get Hebrew month
+      const monthNum = hDate.getMonth();
+      const monthName = HEBREW_MONTHS[monthNum] || `חודש ${monthNum}`;
+      
+      // Get Hebrew year
+      const hebYear = gematriya(hDate.getFullYear());
+      
+      // Check for holidays
+      const events = HebrewCalendar.getHolidaysOnDate(hDate, true);
+      let holidayText = "";
+      
+      if (events && events.length > 0) {
+        // Filter out minor holidays and modern holidays if needed
+        const mainHolidays = events.filter(ev => {
+          const desc = ev.getDesc();
+          return desc && !desc.includes('Minor') && !desc.includes('Modern');
+        });
+        
+        if (mainHolidays.length > 0) {
+          holidayText = mainHolidays[0].render('he');
+          // If it's Shabbat, add the parasha
+          if (hDate.getDay() === 6) {
+            const parashaEvent = events.find(ev => ev.getDesc() === 'Parashat');
+            if (parashaEvent) {
+              holidayText = `שבת פרשת ${parashaEvent.render('he')}`;
+            } else {
+              holidayText = 'שבת';
+            }
+          }
+        }
+      }
+      
+      setHoliday(holidayText);
+      setHebrewDate(`${hebDay} ${monthName} ${hebYear}`);
+
+    } catch (error) {
+      console.error('Error updating Hebrew date:', error);
+      console.error('Error details:', {
+        input: gregorianDate,
+        error: error.message,
+        stack: error.stack
+      });
+      setHebrewDate('');
+      setHoliday('');
+    }
+  };
+
+  // Update Hebrew date when Gregorian date changes
+  useEffect(() => {
+    if (date) {
+      updateHebrewDate(date);
+    }
+  }, [date]); // Only depend on date changes
+
+  return (
+    <>
+      <Head>
+        <title>{t.title}</title>
+        <meta name="description" content={t.subtitle} />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+        <style jsx global>{`
+          * {
+            box-sizing: border-box;
+          }
+          
+          html {
+            direction: ${currentLangData?.dir || 'rtl'};
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          }
+          
+          body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+          }
+
+          .goog-te-banner-frame {
+            display: none !important;
+          }
+          
+          .goog-te-menu-value {
+            padding: 3px 5px;
+            font-size: 12px;
+          }
+          
+          #google_translate_element {
+            display: none;
+          }
+          
+          input[type="date"], input[type="text"], input[type="number"] {
+            color-scheme: light !important;
+            background-color: white !important;
+            color: #333 !important;
+          }
+          
+          .language-dropdown::-webkit-scrollbar {
+            width: 8px;
+          }
+          
+          .language-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+          }
+          
+          .language-dropdown::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+          }
+          
+          .language-dropdown::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+          }
+          
+          @media (max-width: 768px) {
+            .main-container {
+              margin: 40px auto 0 !important;
+              border-radius: 10px !important;
+            }
+            
+            .header-padding {
+              padding: 15px !important;
+            }
+            
+            .content-padding {
+              padding: 15px !important;
+            }
+            
+            .card-grid {
+              grid-template-columns: 1fr !important;
+              gap: 12px !important;
+              padding: 0 !important;
+            }
+            
+            .input-responsive {
+              width: 100% !important;
+              max-width: none !important;
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .outer-padding {
+              padding: 5px !important;
+            }
+            
+            .main-container {
+              margin: 30px auto 0 !important;
+            }
+          }
+        `}</style>
+      </Head>
+      
+      <div className="outer-padding" style={{ 
+        minHeight: '100vh',
+        padding: '10px',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        {/* בס"ד / B"H in top right corner */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          right: currentLangData?.dir === 'rtl' ? '10px' : 'auto',
+          left: currentLangData?.dir === 'ltr' ? '10px' : 'auto',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          color: 'white',
+          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+          zIndex: 1000
+        }}>
+          {t.bsd}
+        </div>
+
+        {/* Language Selector */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          left: currentLangData?.dir === 'rtl' ? '10px' : 'auto',
+          right: currentLangData?.dir === 'ltr' ? '10px' : 'auto',
+          zIndex: 1001
+        }}>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              style={{
+                padding: '6px 10px',
+                fontSize: '13px',
+                border: '2px solid white',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255,255,255,0.95)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: '#2c3e50',
+                fontWeight: '500'
+              }}
+            >
+              {currentLangData?.dir === 'rtl' ? (
+                <>
+                  <span>▼</span>
+                  <span>{currentLangData?.name}</span>
+                  <span>{currentLangData?.flag}</span>
+                </>
+              ) : (
+                <>
+                  <span>{currentLangData?.flag}</span>
+                  <span>{currentLangData?.name}</span>
+                  <span>▼</span>
+                </>
+              )}
+            </button>
+            
+            {showLanguageDropdown && (
+              <div className="language-dropdown" style={{
+                position: 'absolute',
+                top: '100%',
+                left: currentLangData?.dir === 'rtl' ? 'auto' : '0',
+                right: currentLangData?.dir === 'rtl' ? '0' : 'auto',
+                backgroundColor: 'white',
+                border: '2px solid #ddd',
+                borderRadius: '8px',
+                maxHeight: '250px',
+                overflowY: 'auto',
+                zIndex: 1002,
+                boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+                minWidth: '180px',
+                width: '200px'
+              }}>
+                {LANGUAGES.map((lang) => (
+                  <div
+                    key={lang.code}
+                    onClick={() => handleLanguageChange(lang.code)}
+                    style={{
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #eee',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: currentLanguage === lang.code ? '#f0f8ff' : 'white',
+                      fontSize: '13px',
+                      color: '#2c3e50',
+                      fontWeight: '500'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = currentLanguage === lang.code ? '#f0f8ff' : 'white'}
+                  >
+                    {currentLangData?.dir === 'rtl' ? (
+                      <>
+                        <span>{lang.name}</span>
+                        <span>{lang.flag}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{lang.flag}</span>
+                        <span>{lang.name}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+                
+                {/* Scroll indicator */}
+                <div style={{
+                  padding: '8px 10px',
+                  backgroundColor: '#f8f9fa',
+                  borderTop: '1px solid #eee',
+                  fontSize: '11px',
+                  color: '#666',
+                  textAlign: 'center',
+                  fontStyle: 'italic'
+                }}>
+                  {currentLanguage === 'he' ? 'גלול לעוד שפות ↕' : 'Scroll for more languages ↕'}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Hidden Google Translate Element */}
+        <div id="google_translate_element" style={{ display: 'none' }}></div>
+        
+        {/* Reset Translation Button */}
+        {currentLanguage !== 'he' && !TRANSLATIONS[currentLanguage] && (
+          <div style={{
+            position: 'fixed',
+            bottom: '15px',
+            right: '15px',
+            zIndex: 1001
+          }}>
+            <button
+              onClick={() => {
+                setCurrentLanguage('he');
+                window.location.reload();
+              }}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+              }}
+                          >
+                {currentLangData?.dir === 'rtl' ? (
+                  <>
+                    {currentLanguage === 'he' ? 'חזור לעברית' : 'Back to Hebrew'}
+                    <span style={{ marginLeft: '4px' }}>🔄</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ marginRight: '4px' }}>🔄</span>
+                    {currentLanguage === 'he' ? 'חזור לעברית' : 'Back to Hebrew'}
+                  </>
+                )}
+              </button>
+          </div>
+        )}
+
+        <div className="main-container" style={{
+          maxWidth: '1200px',
+          margin: '50px auto 0',
+          backgroundColor: 'white',
+          borderRadius: '15px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+          overflow: 'hidden'
+        }}>
+          {/* Header */}
+          <div className="header-padding" style={{
+            background: 'linear-gradient(45deg, #2c3e50, #3498db)',
+            color: 'white',
+            padding: '20px',
+            textAlign: 'center'
+          }}>
+            <h1 style={{ 
+              margin: '0',
+              fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+              fontWeight: '300',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px'
+            }}>
+              {currentLangData?.dir === 'rtl' ? (
+                <>
+                  <span>🕐</span>
+                  {t.title}
+                </>
+              ) : (
+                <>
+                  {t.title}
+                  <span>🕐</span>
+                </>
+              )}
+            </h1>
+            <p style={{ 
+              margin: '10px 0 0 0',
+              fontSize: 'clamp(0.9rem, 2.5vw, 1.1rem)',
+              opacity: '0.9'
+            }}>
+              {t.subtitle}
+            </p>
+            <p style={{ 
+              margin: '5px 0 0 0',
+              fontSize: '14px',
+              color: 'rgba(255,255,255,0.8)'
+            }}>
+              ©נוצר על ידי תחום ניהו"ג - חיים פיציק קוה
+            </p>
+            
+          </div>
+
+          {/* Main Content */}
+          <div className="content-padding" style={{ padding: '20px' }}>
+            
+            {/* Date Selection */}
+            <div style={{ 
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '10px',
+              border: '2px solid #e9ecef'
+            }}>
+              <label htmlFor="date" style={{ 
+                display: 'block',
+                marginBottom: '10px',
+                fontSize: '1.1rem',
+                fontWeight: '600',
+                color: '#2c3e50'
+              }}>
+                {currentLangData?.dir === 'rtl' ? (
+                  <>
+                    {t.selectDate} 📅
+                  </>
+                ) : (
+                  <>
+                    📅 {t.selectDate}
+                  </>
+                )}
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'nowrap' }}>
+                <input
+                  type="date"
+                  id="date"
+                  value={date}
+                  onChange={e => {
+                    setDate(e.target.value);
+                    updateHebrewDate(e.target.value);
+                  }}
+                  style={{ 
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    border: '2px solid #ddd',
+                    borderRadius: '8px',
+                    width: '200px',
+                    direction: 'ltr',
+                    colorScheme: 'light',
+                    flexShrink: 0
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  gap: '10px',
+                  flexWrap: 'nowrap',
+                  flex: 1,
+                  minWidth: 0
+                }}>
+                  <div style={{
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    backgroundColor: '#e3f2fd',
+                    border: '2px solid #1565c0',
+                    borderRadius: '8px',
+                    color: '#1565c0',
+                    fontWeight: '500',
+                    direction: 'rtl',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    flex: '1 1 0',
+                    minWidth: 0,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {hebrewDate}
+                  </div>
+                  {holiday && (
+                    <div style={{
+                      padding: '12px 15px',
+                      fontSize: '16px',
+                      backgroundColor: '#fdf6e8',
+                      border: '2px solid #f39c12',
+                      borderRadius: '8px',
+                      color: '#d35400',
+                      fontWeight: '500',
+                      direction: 'rtl',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      flex: '1 1 0',
+                      minWidth: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {holiday}
+                    </div>
+                  )}
+                  <div style={{
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    backgroundColor: '#f3e5f5',
+                    border: '2px solid #7b1fa2',
+                    borderRadius: '8px',
+                    color: '#7b1fa2',
+                    fontWeight: '500',
+                    direction: 'rtl',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    flex: '0 0 auto',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {isIsraelDST(new Date(date)) ? 'שעון קיץ' : 'שעון חורף'}
+                  </div>
+                </div>
+              </div>      
+            
+            {/* Location Selection */}
+            <div style={{ 
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '10px',
+              border: '2px solid #e9ecef'
+            }}>
+              <label style={{ 
+                display: 'block',
+                marginBottom: '15px',
+                fontSize: '1.1rem',
+                fontWeight: '600',
+                color: '#2c3e50'
+              }}>
+                {currentLangData?.dir === 'rtl' ? (
+                  <>
+                    {t.selectLocation} 📍
+                  </>
+                ) : (
+                  <>
+                    📍 {t.selectLocation}
+                  </>
+                )}
+              </label>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <div style={{
+                  display: 'flex',
+                  gap: '15px',
+                  marginBottom: '10px',
+                  flexWrap: 'wrap'
+                }}>
+                  <label style={{ 
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    backgroundColor: !useManualCoords ? '#e8f4fd' : '#f8f9fa',
+                    border: `2px solid ${!useManualCoords ? '#3498db' : '#ddd'}`,
+                    borderRadius: '8px',
+                    transition: 'all 0.3s ease',
+                    color: '#2c3e50',
+                    fontWeight: '500'
+                  }}>
+                    <input
+                      type="radio"
+                      name="locationMethod"
+                      checked={!useManualCoords}
+                      onChange={() => setUseManualCoords(false)}
+                      style={{ 
+                        margin: currentLangData?.dir === 'rtl' ? '0 0 0 8px' : '0 8px 0 0'
+                      }}
+                    />
+                    {currentLangData?.dir === 'rtl' ? (
+                      <>
+                        {currentLanguage === 'he' ? 'בחר מרשימת ערים' : 'Choose from city list'} 🏙️
+                      </>
+                    ) : (
+                      <>
+                        🏙️ {currentLanguage === 'he' ? 'בחר מרשימת ערים' : 'Choose from city list'}
+                      </>
+                    )}
+                  </label>
+                  
+                  <label style={{ 
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    backgroundColor: useManualCoords ? '#e8f4fd' : '#f8f9fa',
+                    border: `2px solid ${useManualCoords ? '#3498db' : '#ddd'}`,
+                    borderRadius: '8px',
+                    transition: 'all 0.3s ease',
+                    color: '#2c3e50',
+                    fontWeight: '500'
+                  }}>
+                    <input
+                      type="radio"
+                      name="locationMethod"
+                      checked={useManualCoords}
+                      onChange={() => setUseManualCoords(true)}
+                      style={{ 
+                        margin: currentLangData?.dir === 'rtl' ? '0 0 0 8px' : '0 8px 0 0'
+                      }}
+                    />
+                    {currentLangData?.dir === 'rtl' ? (
+                      <>
+                        {currentLanguage === 'he' ? 'הזן קורדינאטות ידנית' : 'Enter coordinates manually'} 📍
+                      </>
+                    ) : (
+                      <>
+                        📍 {currentLanguage === 'he' ? 'הזן קורדינאטות ידנית' : 'Enter coordinates manually'}
+                      </>
+                    )}
+                  </label>
+                </div>
+                
+                {!useManualCoords && (
+                  <div style={{ 
+                    padding: '10px',
+                    backgroundColor: '#e8f4fd',
+                    borderRadius: '8px',
+                    border: '1px solid #3498db'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      color: '#2980b9'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          <span>{currentLanguage === 'he' ? 
+                            `חיפוש מעל ${PREDEFINED_CITIES.length} ערים פופולריות מכל העולם` : 
+                            `Search over ${PREDEFINED_CITIES.length} popular cities worldwide`}</span>
+                          <span>🏙️</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🏙️</span>
+                          <span>{currentLanguage === 'he' ? 
+                            `חיפוש מעל ${PREDEFINED_CITIES.length} ערים פופולריות מכל העולם` : 
+                            `Search over ${PREDEFINED_CITIES.length} popular cities worldwide`}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {useManualCoords && (
+                  <div style={{ 
+                    padding: '15px',
+                    backgroundColor: '#f0f8ff',
+                    borderRadius: '8px',
+                    border: '1px solid #3498db'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      color: '#2980b9',
+                      marginBottom: '10px'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          <span>{currentLanguage === 'he' ? 
+                            'הזן קורדינאטות מדויקות של כל מקום בעולם' : 
+                            'Enter precise coordinates for any location worldwide'}</span>
+                          <span>📍</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📍</span>
+                          <span>{currentLanguage === 'he' ? 
+                            'הזן קורדינאטות מדויקות של כל מקום בעולם' : 
+                            'Enter precise coordinates for any location worldwide'}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {!useManualCoords ? (
+                <div style={{ position: 'relative' }} ref={searchInputRef}>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onFocus={() => {
+                        if (searchTerm.length > 0) {
+                          setShowSearchResults(true);
+                        }
+                      }}
+                      placeholder={currentLanguage === 'he' ? 'הקלד שם עיר מכל העולם...' : 'Type any city name worldwide...'}
+                      className="input-responsive"
+                      style={{
+                        padding: currentLangData?.dir === 'rtl' ? '12px 40px 12px 15px' : '12px 15px 12px 40px',
+                        fontSize: '16px',
+                        width: '100%',
+                        maxWidth: '350px',
+                        border: '2px solid #ddd',
+                        borderRadius: '8px',
+                        textAlign: currentLangData?.dir === 'rtl' ? 'right' : 'left',
+                        outline: 'none',
+                        borderColor: showSearchResults ? '#3498db' : '#ddd',
+                        boxSizing: 'border-box',
+                        colorScheme: 'light'
+                      }}
+                    />
+                    
+                    {/* Search icon */}
+                    <span style={{
+                      position: 'absolute',
+                      top: '50%',
+                      [currentLangData?.dir === 'rtl' ? 'right' : 'left']: '12px',
+                      transform: 'translateY(-50%)',
+                      color: '#666',
+                      fontSize: '16px',
+                      pointerEvents: 'none'
+                    }}>
+                      🔍
+                    </span>
+                    
+                    {/* Clear button */}
+                    {searchTerm && (
+                      <button
+                        onClick={clearSearch}
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          [currentLangData?.dir === 'rtl' ? 'left' : 'right']: '8px',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '18px',
+                          cursor: 'pointer',
+                          color: '#999',
+                          padding: '4px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  display: 'flex',
+                  gap: '10px',
+                  flexWrap: 'wrap'
+                }}>
+                  <input
+                    type="number"
+                    value={manualLat}
+                    onChange={(e) => setManualLat(e.target.value)}
+                    placeholder={currentLanguage === 'he' ? 'קו רוחב' : 'Latitude'}
+                    style={{
+                      padding: '12px 15px',
+                      fontSize: '16px',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                      width: '150px',
+                      direction: 'ltr',
+                      colorScheme: 'light'
+                    }}
+                  />
+                  <input
+                    type="number"
+                    value={manualLng}
+                    onChange={(e) => setManualLng(e.target.value)}
+                    placeholder={currentLanguage === 'he' ? 'קו אורך' : 'Longitude'}
+                    style={{
+                      padding: '12px 15px',
+                      fontSize: '16px',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                      width: '150px',
+                      direction: 'ltr',
+                      colorScheme: 'light'
+                    }}
+                  />
+                  <button
+                    onClick={handleManualCoordsSubmit}
+                    style={{
+                      padding: '12px 20px',
+                      fontSize: '16px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.3s ease'
+                    }}
+                  >
+                    {currentLanguage === 'he' ? 'חשב זמנים' : 'Calculate Times'}
+                  </button>
+                  <button
+                    onClick={clearManualCoords}
+                    style={{
+                      padding: '12px 20px',
+                      fontSize: '16px',
+                      backgroundColor: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.3s ease'
+                    }}
+                  >
+                    {currentLanguage === 'he' ? 'נקה' : 'Clear'}
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Calculate Button */}
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <button 
+                onClick={getZmanim}
+                style={{
+                  padding: '15px 40px',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  background: 'linear-gradient(45deg, #27ae60, #2ecc71)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  boxShadow: '0 5px 15px rgba(46, 204, 113, 0.3)',
+                  transition: 'all 0.3s ease',
+                  transform: 'translateY(0)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 7px 20px rgba(46, 204, 113, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 5px 15px rgba(46, 204, 113, 0.3)';
+                }}
+              >
+                {currentLangData?.dir === 'rtl' ? (
+                  <>
+                    {t.calculate}
+                    <span style={{ marginLeft: '8px' }}>🔍</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ marginRight: '8px' }}>🔍</span>
+                    {t.calculate}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Results */}
+            {(alot90 || error) && (
+              <div style={{ 
+                backgroundColor: '#f8f9fa',
+                padding: '25px',
+                borderRadius: '15px',
+                border: '2px solid #e9ecef',
+                boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ 
+                  margin: '0 0 20px 0',
+                  color: '#2c3e50',
+                  fontSize: 'clamp(1.2rem, 3.5vw, 1.5rem)',
+                  textAlign: 'center',
+                  borderBottom: '2px solid #3498db',
+                  paddingBottom: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}>
+                  {currentLangData?.dir === 'rtl' ? (
+                    <>
+                      {currentLanguage === 'he' ? `זמני התפילה ל${locationName}` : `Prayer Times for ${locationName}`}
+                      <span>🕐</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🕐</span>
+                      {currentLanguage === 'he' ? `זמני התפילה ל${locationName}` : `Prayer Times for ${locationName}`}
+                    </>
+                  )}
+                </h3>
+                
+                {error && (
+                  <div style={{ 
+                    color: '#e74c3c',
+                    backgroundColor: '#fadbd8',
+                    padding: '15px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    border: '1px solid #e74c3c'
+                  }}>
+                    {currentLangData?.dir === 'rtl' ? (
+                      <>
+                        {error} ❌
+                      </>
+                    ) : (
+                      <>
+                        ❌ {error}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="card-grid" style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: '15px',
+                  padding: '0 5px'
+                }}>
+                  {/* Morning Times */}
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <h4 style={{ 
+                      color: '#e67e22',
+                      marginTop: '0',
+                      marginBottom: '15px',
+                      fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+                      borderBottom: '1px solid #e67e22',
+                      paddingBottom: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexDirection: currentLangData?.dir === 'rtl' ? 'row' : 'row'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          {t.morningTimes}
+                          <span>🌅</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🌅</span>
+                          {t.morningTimes}
+                        </>
+                      )}
+                    </h4>
+                    {alot90 && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'עלות השחר:' : 'Dawn:'}</strong> {alot90}</p>}
+                    {alot72 && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'עלות השחר (72 דק\'):' : 'Dawn (72 min):'}</strong> {alot72}</p>}
+                    {talitTefillin && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'טלית ותפילין:' : 'Tallit & Tefillin:'}</strong> {talitTefillin}</p>}
+                    {zricha && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'זריחה:' : 'Sunrise:'}</strong> {zricha}</p>}
+                    {sofShemaMGA && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'סוף זמן קריאת שמע (מג"א):' : 'Latest Shema (MGA):'}</strong> {sofShemaMGA}</p>}
+                    {sofShemaGRA && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'סוף זמן קריאת שמע (גר"א):' : 'Latest Shema (GRA):'}</strong> {sofShemaGRA}</p>}
+                    {sofTefilaMGA && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'סוף זמן תפילה (מג"א):' : 'Latest Tefillah (MGA):'}</strong> {sofTefilaMGA}</p>}
+                    {sofTefilaGRA && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'סוף זמן תפילה (גר"א):' : 'Latest Tefillah (GRA):'}</strong> {sofTefilaGRA}</p>}
+                  </div>
+
+                  {/* Day Times */}
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <h4 style={{ 
+                      color: '#f39c12',
+                      marginTop: '0',
+                      marginBottom: '15px',
+                      fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+                      borderBottom: '1px solid #f39c12',
+                      paddingBottom: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          {t.dayTimes}
+                          <span>☀️</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>☀️</span>
+                          {t.dayTimes}
+                        </>
+                      )}
+                    </h4>
+                    {chatzot && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'חצות היום:' : 'Midday:'}</strong> {chatzot}</p>}
+                    {minchaGedola && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'מנחה גדולה:' : 'Mincha Gedola:'}</strong> {minchaGedola}</p>}
+                    {minchaKetana && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'מנחה קטנה:' : 'Mincha Ketana:'}</strong> {minchaKetana}</p>}
+                    {shkiya && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'שקיעה:' : 'Sunset:'}</strong> {shkiya}</p>}
+                  </div>
+
+                  {/* Evening Times */}
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <h4 style={{ 
+                      color: '#8e44ad',
+                      marginTop: '0',
+                      marginBottom: '15px',
+                      fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+                      borderBottom: '1px solid #8e44ad',
+                      paddingBottom: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          {t.eveningTimes}
+                          <span>🌙</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🌙</span>
+                          {t.eveningTimes}
+                        </>
+                      )}
+                    </h4>
+                    {tzait && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'צאת הכוכבים:' : 'Nightfall:'}</strong> {tzait}</p>}
+                    {chatzotHaLayla && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'חצות הלילה:' : 'Midnight:'}</strong> {chatzotHaLayla}</p>}
+                  </div>
+
+                  {/* Shabbat Times */}
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <h4 style={{ 
+                      color: '#2980b9',
+                      marginTop: '0',
+                      marginBottom: '15px',
+                      fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+                      borderBottom: '1px solid #2980b9',
+                      paddingBottom: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      {currentLangData?.dir === 'rtl' ? (
+                        <>
+                          {t.shabbatTimes}
+                          <span>🕯️</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🕯️</span>
+                          {t.shabbatTimes}
+                        </>
+                      )}
+                    </h4>
+                    {kenisatShabbat22 && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'כניסת שבת (22 דק\'):' : 'Candle Lighting (22 min):'}</strong> {kenisatShabbat22}</p>}
+                    {kenisatShabbat30 && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'כניסת שבת (30 דק\'):' : 'Candle Lighting (30 min):'}</strong> {kenisatShabbat30}</p>}
+                    {kenisatShabbat40 && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'כניסת שבת (40 דק\'):' : 'Candle Lighting (40 min):'}</strong> {kenisatShabbat40}</p>}
+                    {yetziatShabbat && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'יציאת שבת:' : 'Havdalah:'}</strong> {yetziatShabbat}</p>}
+                    {parasha && <p style={{color: '#2c3e50', margin: '8px 0'}}><strong>{currentLanguage === 'he' ? 'פרשת השבוע:' : 'Torah Portion:'}</strong> {parasha}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '30px',
+          color: 'white',
+          fontSize: '14px',
+          opacity: '0.8'
+        }}>
+          <p>{t.footer}</p>
+        </div>
+      </div>
+    </>
+  );
+}
