@@ -17,6 +17,8 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import PrayerTimeHighlight from "../components/PrayerTimeHighlight";
 import ThemeToggle from "../components/ThemeToggle";
+import PrayerTimesNotification from "../components/PrayerTimesNotification";
+import SimpleNotification from "../components/SimpleNotification";
 
 // Import Map component dynamically
 const Map = dynamic(() => import("../components/Map"), {
@@ -103,7 +105,7 @@ const TRANSLATIONS = {
     footerFeature3: "מפה אינטראקטיבית",
     footerFeature4: "תמיכה בשפות מרובות",
     footerLegal: "זמנים מחושבים על פי הלכה יהודית",
-    footerMessage: "פותח על ידי מפתחים יהודים למען הקהילה",
+    footerMessage: "פותח על ידי מחלקת ניהו״ג",
     currentDate: "תאריך נוכחי",
     gregorianDate: "תאריך גרגוריאני",
     hebrewDate: "תאריך עברי",
@@ -170,7 +172,7 @@ const TRANSLATIONS = {
     footerFeature3: "Interactive map",
     footerFeature4: "Multi-language support",
     footerLegal: "Times calculated according to Jewish law",
-    footerMessage: "Developed by Jewish developers for the community",
+    footerMessage: "Developed by Nihug Department",
     locationCTA: {
       title: "Enable Location Services",
       description: "Get accurate prayer times for your current location",
@@ -244,7 +246,7 @@ const TRANSLATIONS = {
     footerFeature3: "Mapa interactivo",
     footerFeature4: "Soporte multiidioma",
     footerLegal: "Horarios calculados según la ley judía",
-    footerMessage: "Desarrollado por desarrolladores judíos para la comunidad",
+    footerMessage: "Desarrollado por Departamento Nihug",
     currentDate: "Fecha Actual",
     gregorianDate: "Fecha Gregoriana",
     hebrewDate: "Fecha Hebrea",
@@ -267,6 +269,12 @@ const TRANSLATIONS = {
     clear: "Limpiar",
     clickMapToSelect: "Haga clic en el mapa para seleccionar ubicación",
     currentLocationLabel: "Ubicación Actual:",
+    // Prayer Times Notifications
+    prayerTimesUpdated: "¡Horarios de oración actualizados!",
+    newTimesAvailable: "Nuevos horarios disponibles",
+    moreChanges: "más cambios",
+    viewTimes: "Ver Horarios",
+    later: "Más tarde",
   },
   fr: {
     title: "Horaires de Prière Juive",
@@ -291,7 +299,7 @@ const TRANSLATIONS = {
     footerFeature3: "Carte interactive",
     footerFeature4: "Support multilingue",
     footerLegal: "Horaires calculés selon la loi juive",
-    footerMessage: "Développé par des développeurs juifs pour la communauté",
+    footerMessage: "Développé par Département Nihug",
     currentDate: "Date Actuelle",
     gregorianDate: "Date Grégorienne",
     hebrewDate: "Date Hébraïque",
@@ -314,6 +322,12 @@ const TRANSLATIONS = {
     clear: "Effacer",
     clickMapToSelect: "Cliquez sur la carte pour sélectionner l'emplacement",
     currentLocationLabel: "Emplacement Actuel:",
+    // Prayer Times Notifications
+    prayerTimesUpdated: "Horaires de prière mis à jour !",
+    newTimesAvailable: "Nouveaux horaires disponibles",
+    moreChanges: "plus de changements",
+    viewTimes: "Voir les Horaires",
+    later: "Plus tard",
   },
   de: {
     title: "Jüdische Gebetszeiten",
@@ -338,7 +352,7 @@ const TRANSLATIONS = {
     footerFeature3: "Interaktive Karte",
     footerFeature4: "Mehrsprachige Unterstützung",
     footerLegal: "Zeiten nach jüdischem Gesetz berechnet",
-    footerMessage: "Entwickelt von jüdischen Entwicklern für die Gemeinschaft",
+    footerMessage: "Entwickelt von Nihug Abteilung",
     currentDate: "Aktuelles Datum",
     gregorianDate: "Gregorianisches Datum",
     hebrewDate: "Hebräisches Datum",
@@ -361,6 +375,12 @@ const TRANSLATIONS = {
     clear: "Löschen",
     clickMapToSelect: "Klicken Sie auf die Karte, um den Standort auszuwählen",
     currentLocationLabel: "Aktueller Standort:",
+    // Prayer Times Notifications
+    prayerTimesUpdated: "Gebetszeiten aktualisiert!",
+    newTimesAvailable: "Neue Zeiten verfügbar",
+    moreChanges: "mehr Änderungen",
+    viewTimes: "Zeiten Anzeigen",
+    later: "Später",
   },
 };
 
@@ -378,6 +398,7 @@ function PrayerTimesApp() {
 
   // Prayer times state
   const [prayerTimes, setPrayerTimes] = useState({});
+  const [previousPrayerTimes, setPreviousPrayerTimes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -408,6 +429,7 @@ function PrayerTimesApp() {
 
   // Theme state
   const [isDark, setIsDark] = useState(false);
+  const [themeMode, setThemeMode] = useState("auto"); // "auto", "light", "dark"
 
   const [expandedSections, setExpandedSections] = useState({
     morning: false,
@@ -554,6 +576,8 @@ function PrayerTimesApp() {
         parasha: data.parasha,
       };
 
+      // Save previous prayer times before updating
+      setPreviousPrayerTimes(prayerTimes);
       setPrayerTimes(formattedTimes);
     } catch (e) {
       console.error("Error getting prayer times:", e);
@@ -590,15 +614,31 @@ function PrayerTimesApp() {
     boot.updatePrefs({ lastDateISO: newDate.toISOString() });
   };
 
-  // Theme management
-  useEffect(() => {
-    // Check for saved theme preference or default to light mode
-    const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
+  // Function to determine if it's night time
+  const isNightTime = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    // Night time: 18:00 - 06:00 (6 PM - 6 AM)
+    return hour >= 18 || hour < 6;
+  };
 
-    const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
+  // Function to update theme based on mode
+  const updateTheme = (mode) => {
+    let shouldBeDark = false;
+
+    switch (mode) {
+      case "auto":
+        shouldBeDark = isNightTime();
+        break;
+      case "dark":
+        shouldBeDark = true;
+        break;
+      case "light":
+        shouldBeDark = false;
+        break;
+      default:
+        shouldBeDark = false;
+    }
 
     setIsDark(shouldBeDark);
 
@@ -608,19 +648,25 @@ function PrayerTimesApp() {
     } else {
       document.documentElement.classList.remove("dark");
     }
+  };
+
+  // Theme management
+  useEffect(() => {
+    // Check for saved theme preference
+    const savedThemeMode = localStorage.getItem("themeMode") || "light";
+    setThemeMode(savedThemeMode);
+
+    // Update theme based on saved mode
+    updateTheme(savedThemeMode);
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = !isDark;
-    setIsDark(newTheme);
+    // Simple toggle between light and dark
+    const newMode = themeMode === "dark" ? "light" : "dark";
 
-    if (newTheme) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
+    setThemeMode(newMode);
+    localStorage.setItem("themeMode", newMode);
+    updateTheme(newMode);
   };
 
   const toggleSection = (section) => {
@@ -687,7 +733,7 @@ function PrayerTimesApp() {
         <title>{t.title}</title>
         <meta name="description" content={t.subtitle} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.png" />
       </Head>
 
       {/* Location CTA */}
@@ -699,6 +745,9 @@ function PrayerTimesApp() {
           translations={t}
         />
       )}
+
+      {/* Prayer Times Notification */}
+      <SimpleNotification prayerTimes={prayerTimes} translations={t} />
 
       <HydrationGuard
         fallback={
@@ -1094,8 +1143,12 @@ function PrayerTimesApp() {
                 <div
                   onClick={toggleTheme}
                   className="relative w-10 h-10 bg-black border-2 border-gray-800 rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center cursor-pointer"
-                  title={isDark ? "מעבר למצב יום" : "מעבר למצב לילה"}
-                  aria-label={isDark ? "מעבר למצב יום" : "מעבר למצב לילה"}
+                  title={
+                    themeMode === "dark"
+                      ? "מצב לילה (לחץ למצב יום)"
+                      : "מצב יום (לחץ למצב לילה)"
+                  }
+                  aria-label={themeMode === "dark" ? "מצב לילה" : "מצב יום"}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
@@ -1106,7 +1159,7 @@ function PrayerTimesApp() {
                   }}
                 >
                   <span className="text-white text-sm font-bold">
-                    {isDark ? "☀" : "🌙"}
+                    {themeMode === "dark" ? "🌙" : "☀"}
                   </span>
                 </div>
               </div>

@@ -410,7 +410,7 @@ const HebrewCalendarComponent = ({
           {/* Date Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Gregorian Date Card */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                 {translations.gregorianDate ||
                   (currentLanguage === "he"
@@ -424,12 +424,12 @@ const HebrewCalendarComponent = ({
             </div>
 
             {/* Hebrew Date Card */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">
+            <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+              <div className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">
                 {translations.hebrewDate ||
                   (currentLanguage === "he" ? "תאריך עברי" : "Hebrew Date")}
               </div>
-              <div className="text-base font-semibold text-blue-800">
+              <div className="text-base font-semibold text-blue-800 dark:text-blue-200">
                 {hebrewDateShort}
               </div>
             </div>
