@@ -15,8 +15,6 @@ import HebrewCalendar from "../components/HebrewCalendar";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
-import PrayerTimesNotification from "../components/PrayerTimesNotification";
-import SmartPrayerReminders from "../components/SmartPrayerReminders";
 import PrayerTimeHighlight from "../components/PrayerTimeHighlight";
 import ThemeToggle from "../components/ThemeToggle";
 
@@ -51,7 +49,7 @@ const PREDEFINED_CITIES = [
   { name: "אשדוד, ישראל (UTC+2/+3)", lat: 31.794, lng: -34.6446 },
   { name: "פתח תקווה, ישראל (UTC+2/+3)", lat: 32.087, lng: -34.8879 },
   { name: "משמר השבעה, ישראל (UTC+2/+3)", lat: 31.8167, lng: -34.8167 },
-  
+
   // USA - Major Jewish Communities
   { name: "ניו יורק, ארצות הברית (UTC-4/-5)", lat: 40.7128, lng: 74.006 },
   { name: "ברוקלין, ניו יורק (UTC-4/-5)", lat: 40.6782, lng: 73.9442 },
@@ -156,7 +154,7 @@ const TRANSLATIONS = {
     selectLocation: "Select Location:",
     calculate: "Calculate Prayer Times",
     morningTimes: "Morning Times",
-    dayTimes: "Day Times", 
+    dayTimes: "Day Times",
     eveningTimes: "Evening Times",
     shabbatTimes: "Shabbat Times",
     footer:
@@ -380,7 +378,6 @@ function PrayerTimesApp() {
 
   // Prayer times state
   const [prayerTimes, setPrayerTimes] = useState({});
-  const [previousPrayerTimes, setPreviousPrayerTimes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -393,9 +390,11 @@ function PrayerTimesApp() {
   });
 
   const [currentLocation, setCurrentLocation] = useState(() => {
-    if (boot.prefs.lastCity) {
-      return boot.prefs.lastCity;
+    // Clear any saved map location to force Jerusalem default
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("idf-zmanim:map:view");
     }
+    // Always start with Jerusalem, ignore saved preferences
     return DEFAULT_CITIES.JERUSALEM;
   });
 
@@ -442,7 +441,7 @@ function PrayerTimesApp() {
           if (result.holidays && result.holidays.length > 0) {
             if (holidayText) {
               holidayText += ` • ${result.holidays[0]}`;
-      } else {
+            } else {
               holidayText = result.holidays[0];
             }
           }
@@ -453,7 +452,7 @@ function PrayerTimesApp() {
     }
   }, [date, prayerTimes.parasha]);
 
-    // Update document direction and language
+  // Update document direction and language
   useEffect(() => {
     document.documentElement.dir = currentLangData?.dir || "rtl";
     document.documentElement.lang = currentLanguage;
@@ -513,7 +512,7 @@ function PrayerTimesApp() {
 
       const response = await fetch("/api/zmanim", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -555,8 +554,6 @@ function PrayerTimesApp() {
         parasha: data.parasha,
       };
 
-      // Save previous prayer times before updating
-      setPreviousPrayerTimes(prayerTimes);
       setPrayerTimes(formattedTimes);
     } catch (e) {
       console.error("Error getting prayer times:", e);
@@ -608,7 +605,7 @@ function PrayerTimesApp() {
     // Apply theme immediately
     if (shouldBeDark) {
       document.documentElement.classList.add("dark");
-        } else {
+    } else {
       document.documentElement.classList.remove("dark");
     }
   }, []);
@@ -620,7 +617,7 @@ function PrayerTimesApp() {
     if (newTheme) {
       document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
-        } else {
+    } else {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
@@ -692,7 +689,7 @@ function PrayerTimesApp() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      
+
       {/* Location CTA */}
       {boot.showLocationCTA && (
         <LocationCTA
@@ -703,21 +700,14 @@ function PrayerTimesApp() {
         />
       )}
 
-      {/* Prayer Times Notifications */}
-      <PrayerTimesNotification
-        prayerTimes={prayerTimes}
-        previousPrayerTimes={previousPrayerTimes}
-        translations={t}
-      />
-
       <HydrationGuard
         fallback={
           <div className="min-h-screen bg-gradient-to-br from-idf-olive-50 via-idf-olive-100 to-idf-gold-50 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-idf-olive-600 mx-auto mb-4"></div>
               <p className="text-idf-olive-700 font-medium">טוען...</p>
-                </div>
-              </div>
+            </div>
+          </div>
         }
       >
         <main
@@ -745,7 +735,7 @@ function PrayerTimesApp() {
                       alt="לוגו"
                       className="relative h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 border-white/20"
                     />
-          </div>
+                  </div>
                   <div className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-lg opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
                     <img
@@ -754,14 +744,14 @@ function PrayerTimesApp() {
                       className="relative h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 border-white/20"
                     />
                   </div>
-                    </div>
+                </div>
                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-white text-center sm:text-right mr-4">
                   {t.title}
                 </h1>
-                </div>
               </div>
-            </div>      
-            
+            </div>
+          </div>
+
           {/* Main Content */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pt-20">
             {/* Top Section - Calendar and Location with Smart Responsive Layout */}
@@ -786,8 +776,8 @@ function PrayerTimesApp() {
                   translations={t}
                 />
               </div>
-    </div>
-                
+            </div>
+
             {/* Error Display */}
             {error && (
               <Card variant="danger" className="mb-8">
@@ -796,19 +786,14 @@ function PrayerTimesApp() {
                   <span className="text-red-700 dark:text-red-400">
                     {error}
                   </span>
-                    </div>
+                </div>
               </Card>
             )}
 
             {/* Prayer Times Results */}
             {Object.keys(prayerTimes).length > 0 && (
               <div className="mb-4" data-prayer-times>
-                {/* Smart Prayer Reminders */}
-                <SmartPrayerReminders
-                  prayerTimes={prayerTimes}
-                  currentTime={new Date()}
-                  translations={t}
-                />
+                {/* Smart Prayer Reminders removed */}
 
                 {/* Location Header */}
                 <div className="text-center mb-6">
@@ -816,9 +801,9 @@ function PrayerTimesApp() {
                     <span className="text-gray-800 dark:text-gray-200 font-bold text-xl">
                       {t.prayerTimesFor} 📍 {currentLocation.name}
                     </span>
-                    </div>
-              </div>
-              
+                  </div>
+                </div>
+
                 {/* Prayer Times Cards */}
                 <div className="space-y-4">
                   {/* Morning Times Section */}
@@ -877,7 +862,7 @@ function PrayerTimesApp() {
                         <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
                           {t.dayTimes}
                         </h3>
-                </div>
+                      </div>
                       <Button
                         variant="outline"
                         size="small"
@@ -901,8 +886,8 @@ function PrayerTimesApp() {
                           color="blue"
                           showTitle={false}
                         />
-                  </div>
-                )}
+                      </div>
+                    )}
                   </Card>
 
                   {/* Evening Times Section */}
@@ -943,8 +928,8 @@ function PrayerTimesApp() {
                           color="blue"
                           showTitle={false}
                         />
-                  </div>
-                )}
+                      </div>
+                    )}
                   </Card>
 
                   {/* Shabbat Times Section */}
@@ -976,7 +961,7 @@ function PrayerTimesApp() {
                           {expandedSections.shabbat ? t.close : t.open}
                         </span>
                       </Button>
-                          </div>
+                    </div>
                     {expandedSections.shabbat && (
                       <div className="px-4 pb-4">
                         <PrayerTimeCard
@@ -985,13 +970,13 @@ function PrayerTimesApp() {
                           color="blue"
                           showTitle={false}
                         />
-                          </div>
-                        )}
-                  </Card>
                       </div>
-                  </div>
-                )}
+                    )}
+                  </Card>
+                </div>
               </div>
+            )}
+          </div>
 
           {/* Professional Footer */}
           <footer className="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white mt-16">
@@ -1012,7 +997,7 @@ function PrayerTimesApp() {
                         alt="לוגו צה״ל"
                         className="h-12 w-12 rounded-full border-2 border-white/20"
                       />
-                      </div>
+                    </div>
                     <div>
                       <h3 className="text-2xl font-bold text-white">
                         {t.footerTitle}
@@ -1020,14 +1005,14 @@ function PrayerTimesApp() {
                       <p className="text-blue-200 text-sm">
                         {t.footerSubtitle}
                       </p>
-                      </div>
                     </div>
+                  </div>
                   <p className="text-gray-300 text-sm leading-relaxed mb-4">
                     {t.footerDescription}
                   </p>
                   <div className="text-xs text-gray-400">{t.footerLegal}</div>
-                  </div>
-                  
+                </div>
+
                 {/* Features Section */}
                 <div>
                   <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
@@ -1052,8 +1037,8 @@ function PrayerTimesApp() {
                       {t.footerFeature4}
                     </li>
                   </ul>
-                  </div>
-                  
+                </div>
+
                 {/* Technical Info */}
                 <div>
                   <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
@@ -1066,7 +1051,7 @@ function PrayerTimesApp() {
                         {currentLanguage === "he" ? "גרסה:" : "Version:"}
                       </span>
                       <span className="text-blue-300 font-mono">v2.0.0</span>
-                  </div>
+                    </div>
                     <div className="flex items-center justify-between">
                       <span>
                         {currentLanguage === "he"
@@ -1074,13 +1059,13 @@ function PrayerTimesApp() {
                           : "Last Update:"}
                       </span>
                       <span className="text-blue-300">2024</span>
-                  </div>
+                    </div>
                     <div className="flex items-center justify-between">
                       <span>
                         {currentLanguage === "he" ? "תמיכה:" : "Support:"}
                       </span>
                       <span className="text-green-300">✓ Active</span>
-                </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1090,11 +1075,11 @@ function PrayerTimesApp() {
                 <div className="flex flex-col md:flex-row justify-between items-center">
                   <div className="text-sm text-gray-400 mb-4 md:mb-0">
                     {t.footerCopyright}
-              </div>
+                  </div>
                   <div className="flex items-center space-x-4">
                     <div className="text-xs text-gray-500">
                       {t.footerMessage}
-            </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1123,8 +1108,8 @@ function PrayerTimesApp() {
                   <span className="text-white text-sm font-bold">
                     {isDark ? "☀" : "🌙"}
                   </span>
-            </div>
-                  </div>
+                </div>
+              </div>
 
               {/* Language Selector */}
               <div className="relative group">
@@ -1145,14 +1130,14 @@ function PrayerTimesApp() {
                   <span className="text-white text-sm">
                     {currentLangData?.flag}
                   </span>
-                  </div>
+                </div>
 
                 {showLanguageDropdown && (
                   <div className="absolute bottom-full left-0 mb-3 w-52 bg-white/95 backdrop-blur-md border border-gray-200/80 rounded-2xl shadow-2xl z-[9999] overflow-hidden">
                     <div className="p-3">
                       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-2">
                         {t.selectLanguage || "בחר שפה"}
-                  </div>
+                      </div>
                       {LANGUAGES.map((lang) => (
                         <button
                           key={lang.code}
@@ -1173,12 +1158,12 @@ function PrayerTimesApp() {
                           )}
                         </button>
                       ))}
-                </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-        </div>
         </main>
       </HydrationGuard>
     </>

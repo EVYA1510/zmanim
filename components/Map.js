@@ -50,37 +50,7 @@ const createCustomIcon = () => {
   });
 };
 
-// Load saved map view from localStorage
-const loadMapView = () => {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const saved = localStorage.getItem("idf-zmanim:map:view");
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (error) {
-    console.warn("Failed to load map view:", error);
-  }
-
-  return null;
-};
-
-// Save map view to localStorage
-const saveMapView = (center, zoom) => {
-  if (typeof window === "undefined") return;
-
-  try {
-    const view = {
-      center: [center.lat, center.lng],
-      zoom: zoom,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem("idf-zmanim:map:view", JSON.stringify(view));
-  } catch (error) {
-    console.warn("Failed to save map view:", error);
-  }
-};
+// Simplified map - no localStorage, always Jerusalem
 
 export default function Map({
   onLocationSelect,
@@ -96,27 +66,19 @@ export default function Map({
   useEffect(() => {
     // Initialize map only once
     if (!mapInstanceRef.current && mapRef.current) {
-      // Load saved view or use defaults
-      const savedView = loadMapView();
-      let initialView = [initialLat, initialLng];
-      let initialZoom = 8;
+      // Use provided coordinates or default to Jerusalem
+      let initialView = [initialLat, initialLng]; // Use provided coordinates
+      let initialZoom = 8; // Wide view to show entire region
+      currentZoomRef.current = initialZoom;
 
-      if (savedView && savedView.center && savedView.zoom) {
-        initialView = savedView.center;
-        initialZoom = savedView.zoom;
-        currentZoomRef.current = initialZoom;
-      }
-
-      // Initialize map with Israel bounds
+      // Initialize map without bounds restriction for global access
       mapInstanceRef.current = L.map(mapRef.current, {
-        maxBounds: ISRAEL_BOUNDS,
-        maxBoundsViscosity: 0.8,
+        // Remove bounds restriction to allow global map access
+        // maxBounds: ISRAEL_BOUNDS,
+        // maxBoundsViscosity: 0.8,
       }).setView(initialView, initialZoom);
 
-      // Fit to Israel bounds on first load if no saved view
-      if (!savedView) {
-        mapInstanceRef.current.fitBounds(ISRAEL_BOUNDS);
-      }
+      // No need to set view again - already set in initialization
 
       // Add OpenStreetMap tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -129,7 +91,7 @@ export default function Map({
         const center = mapInstanceRef.current.getCenter();
         const zoom = mapInstanceRef.current.getZoom();
         currentZoomRef.current = zoom;
-        saveMapView(center, zoom);
+        // No need to save view - always start with Jerusalem
       });
 
       // Add click handler
@@ -162,10 +124,10 @@ export default function Map({
         `;
         markerRef.current.bindPopup(popupContent).openPopup();
 
-        // Zoom to the selected location with zoom level 12
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([lat, lng], 12);
-        }
+        // Center the map on the selected location but keep the current zoom level
+        // This allows the user to see the context around the selected location
+        const currentZoom = mapInstanceRef.current.getZoom();
+        mapInstanceRef.current.setView([lat, lng], currentZoom);
       });
 
       // Add initial marker if coordinates are provided
@@ -183,17 +145,17 @@ export default function Map({
         `;
         markerRef.current.bindPopup(popupContent);
 
-        // Zoom to the initial location with zoom level 12
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([initialLat, initialLng], 12);
-        }
+        // No need to set view - already initialized with Jerusalem
       }
     }
 
     // Update marker position if initial coordinates change
     if (mapInstanceRef.current && markerRef.current) {
       const currentPos = markerRef.current.getLatLng();
-      if (currentPos.lat !== initialLat || currentPos.lng !== initialLng) {
+      if (
+        Math.abs(currentPos.lat - initialLat) > 0.001 ||
+        Math.abs(currentPos.lng - initialLng) > 0.001
+      ) {
         markerRef.current.setLatLng([initialLat, initialLng]);
 
         // Update popup content
@@ -206,10 +168,8 @@ export default function Map({
         `;
         markerRef.current.bindPopup(popupContent);
 
-        // Zoom to the new location with zoom level 12
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([initialLat, initialLng], 12);
-        }
+        // Don't automatically center the map - let the user control the view
+        // This prevents the map from jumping back to the selected location
       }
     }
 
